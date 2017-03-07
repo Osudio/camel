@@ -16,6 +16,12 @@
  */
 package org.apache.camel.component.aws.sns;
 
+import java.nio.ByteBuffer;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Map.Entry;
+
+import com.amazonaws.services.sns.model.MessageAttributeValue;
 import com.amazonaws.services.sns.model.PublishRequest;
 import com.amazonaws.services.sns.model.PublishResult;
 
@@ -28,12 +34,6 @@ import org.apache.camel.spi.HeaderFilterStrategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.nio.ByteBuffer;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Map.Entry;
-
 import static org.apache.camel.component.aws.common.AwsExchangeUtil.getMessageForResponse;
 
 
@@ -44,7 +44,7 @@ import static org.apache.camel.component.aws.common.AwsExchangeUtil.getMessageFo
 public class SnsProducer extends DefaultProducer {
 
     private static final Logger LOG = LoggerFactory.getLogger(SnsProducer.class);
-    
+
     private transient String snsProducerToString;
 
     public SnsProducer(Endpoint endpoint) {
@@ -59,13 +59,13 @@ public class SnsProducer extends DefaultProducer {
         request.setMessageStructure(determineMessageStructure(exchange));
         request.setMessage(exchange.getIn().getBody(String.class));
         request.setMessageAttributes(this.translateAttributes(exchange.getIn().getHeaders(), exchange));
-        
+
         LOG.trace("Sending request [{}] from exchange [{}]...", request, exchange);
-        
+
         PublishResult result = getEndpoint().getSNSClient().publish(request);
 
         LOG.trace("Received result [{}]", result);
-        
+
         Message message = getMessageForResponse(exchange);
         message.setHeader(SnsConstants.MESSAGE_ID, result.getMessageId());
     }
@@ -75,7 +75,7 @@ public class SnsProducer extends DefaultProducer {
         if (subject == null) {
             subject = getConfiguration().getSubject();
         }
-        
+
         return subject;
     }
 
@@ -87,39 +87,37 @@ public class SnsProducer extends DefaultProducer {
 
         return structure;
     }
-	private Map<String, MessageAttributeValue> translateAttributes(Map<String, Object> headers, Exchange exchange) {
-        HashMap result = new HashMap();
-        HeaderFilterStrategy headerFilterStrategy = this.getEndpoint().getHeaderFilterStrategy();
-        Iterator var5 = headers.entrySet().iterator();
 
-        while(var5.hasNext()) {
-            Entry entry = (Entry)var5.next();
-            if(!headerFilterStrategy.applyFilterToCamelHeaders((String)entry.getKey(), entry.getValue(), exchange)) {
+    private Map<String, MessageAttributeValue> translateAttributes(Map<String, Object> headers, Exchange exchange) {
+        Map<String, MessageAttributeValue> result = new HashMap<String, MessageAttributeValue>();
+        HeaderFilterStrategy headerFilterStrategy = getEndpoint().getHeaderFilterStrategy();
+        for (Entry<String, Object> entry : headers.entrySet()) {
+            // only put the message header which is not filtered into the message attribute
+            if (!headerFilterStrategy.applyFilterToCamelHeaders(entry.getKey(), entry.getValue(), exchange)) {
                 Object value = entry.getValue();
-                MessageAttributeValue mav;
-                if(value instanceof String) {
-                    mav = new MessageAttributeValue();
+                if (value instanceof String) {
+                    MessageAttributeValue mav = new MessageAttributeValue();
                     mav.setDataType("String");
                     mav.withStringValue((String)value);
                     result.put(entry.getKey(), mav);
-                } else if(value instanceof ByteBuffer) {
-                    mav = new MessageAttributeValue();
+                } else if (value instanceof ByteBuffer) {
+                    MessageAttributeValue mav = new MessageAttributeValue();
                     mav.setDataType("Binary");
                     mav.withBinaryValue((ByteBuffer)value);
                     result.put(entry.getKey(), mav);
                 } else {
-                    LOG.warn("Cannot put the message header key={}, value={} into Sqs MessageAttribute", entry.getKey(), entry.getValue());
+                    // cannot translate the message header to message attribute value
+                    LOG.warn("Cannot put the message header key={}, value={} into Sns MessageAttribute", entry.getKey(), entry.getValue());
                 }
             }
         }
-
         return result;
     }
-	
+
     protected SnsConfiguration getConfiguration() {
         return getEndpoint().getConfiguration();
     }
-    
+
     @Override
     public String toString() {
         if (snsProducerToString == null) {
@@ -127,7 +125,7 @@ public class SnsProducer extends DefaultProducer {
         }
         return snsProducerToString;
     }
-    
+
     @Override
     public SnsEndpoint getEndpoint() {
         return (SnsEndpoint) super.getEndpoint();

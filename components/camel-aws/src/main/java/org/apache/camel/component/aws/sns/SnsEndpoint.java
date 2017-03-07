@@ -34,7 +34,6 @@ import org.apache.camel.Component;
 import org.apache.camel.Consumer;
 import org.apache.camel.Processor;
 import org.apache.camel.Producer;
-import org.apache.camel.component.aws.sqs.SqsHeaderFilterStrategy;
 import org.apache.camel.impl.DefaultEndpoint;
 import org.apache.camel.spi.Metadata;
 import org.apache.camel.spi.UriEndpoint;
@@ -109,7 +108,7 @@ public class SnsEndpoint extends DefaultEndpoint {
 
         // check the setting the headerFilterStrategy
         if (headerFilterStrategy == null) {
-            headerFilterStrategy = new SqsHeaderFilterStrategy();
+            headerFilterStrategy = new SnsHeaderFilterStrategy();
         }
 
         if (configuration.getTopicArn() == null) {
